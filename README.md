@@ -33,6 +33,7 @@ methods/
   common/            method-agnostic core (config, geometry, zernike,
                      phasescreen, simulate, centroid, turbulence)
   modal_zernike/     Method 1: modal Zernike reconstruction               -> methods/modal_zernike/README.md
+  deep_resunet/      Method 3: deep-learning ResU-Net (Noel et al. 2023)  -> methods/deep_resunet/README.md
 validations/         metrics, plots, oracle, report + the pytest suite     -> validations/README.md
 docs/VALIDATION.md   validation methodology & thresholds
 ```

@@ -31,6 +31,34 @@ Each dataset is a sub-folder with:
 These carry **exact ground truth**, so they are what reconstruction accuracy,
 `r0`/`tau0`, and method comparisons are validated against.
 
+### Temporal sequences `(N, T, D, D)`
+
+For predictive / temporal models, [`make_sequence_dataset.py`](make_sequence_dataset.py)
+produces **N independent instances** of **T continuous frames** each
+(multi-layer frozen flow + boiling + von Kármán + subharmonics, rendered with a
+realistic 8-bit detector):
+
+```bash
+python data/make_sequence_dataset.py --n 200 --t 32 --name seq_v1
+./run.sh seqdataset --n 200 --t 32 --name seq_v1
+```
+
+| file | shape | meaning |
+|---|---|---|
+| `frames.npy` | (N, T, D, D) uint8 | detector frames (8-bit counts) |
+| `coeffs.npy` | (N, T, M) | **true** Zernike coeffs (projection of true phase) |
+| `slopes.npy` | (N, T, 2V) | true sub-aperture slopes |
+| `wavefronts.npy` | (N, T, w, w) fp16 | downsampled true phase (zonal target) |
+| `mean_frame.npy` | (N, D, D) | per-instance time-average (average-added ref) |
+| `manifest.json` | — | dt, generator/detector knobs, by-instance train/val/test split |
+
+Load + window with `methods/common/sequence_dataset.py` (torch-free, memory-mapped):
+a window of `K` consecutive frames `[t-K+1 … t]` → label at `t+horizon`
+(`horizon=0` = reconstruct current step from history; `horizon≥1` = forecast).
+**Splitting is by instance** (the N axis) so frames from one turbulence
+realisation never leak across train/val/test. Tunable fidelity knobs:
+`--bits --read-noise --L0 --boil-frac --boil-alpha --layers`.
+
 ## real/
 
 The provided ISRO dataset. Expected per the problem statement:

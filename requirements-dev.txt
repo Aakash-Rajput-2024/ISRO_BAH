@@ -7,3 +7,6 @@ pytest-xdist>=3.5      # parallel test execution (-n auto)
 # so these are optional; install to actually run `pytest -m crossval`.
 aotools>=1.0
 hcipy>=0.6
+
+# Method 3 (deep-learning ResU-Net). Optional; ml-marked tests skip if absent.
+torch>=2.0

@@ -75,3 +75,127 @@ def frozen_flow_sequence(
 
 def _next_even(n: int) -> int:
     return n if n % 2 == 0 else n + 1
+
+
+# --------------------------------------------------------------------------- #
+# Higher-fidelity generators: von Karman outer scale, subharmonic augmentation,
+# and a multi-layer frozen-flow + boiling time series.
+# --------------------------------------------------------------------------- #
+def _subharmonic_screen(npix, dx, r0, L0, rng, n_sub):
+    """Low-frequency subharmonic augmentation (Lane, Glindemann & Dainty 1992).
+
+    Adds sinusoids on successively finer low-frequency grids (3x3 per level) to
+    restore the spatial frequencies the FFT screen under-represents (period =
+    screen size). Pass L0 for a von Karman PSD, else Kolmogorov.
+    """
+    ax = (np.arange(npix) - npix // 2) * dx          # real-space coords [m]
+    X, Y = np.meshgrid(ax, ax)
+    out = np.zeros((npix, npix))
+    D = npix * dx
+    inv_L0_sq = (1.0 / L0) ** 2 if L0 else 0.0
+    for p in range(1, n_sub + 1):
+        df = 1.0 / (3.0 ** p * D)                    # subharmonic cell size
+        for i in (-1, 0, 1):
+            for j in (-1, 0, 1):
+                if i == 0 and j == 0:
+                    continue
+                fx, fy = i * df, j * df
+                f2 = fx * fx + fy * fy
+                psd = 0.023 * r0 ** (-5.0 / 3.0) * (f2 + inv_L0_sq) ** (-11.0 / 6.0)
+                amp = np.sqrt(psd) * df
+                c = (rng.standard_normal() + 1j * rng.standard_normal()) * amp
+                out += np.real(c * np.exp(2j * np.pi * (fx * X + fy * Y)))
+    return out - out.mean()
+
+
+def vonkarman_screen(
+    npix: int, dx: float, r0: float, L0: float | None = None,
+    rng: np.random.Generator | None = None, n_subharmonics: int = 3,
+) -> np.ndarray:
+    """Phase screen with a von Karman (finite outer scale) or Kolmogorov PSD.
+
+    von Karman:  PSD = 0.023 r0^(-5/3) (f^2 + 1/L0^2)^(-11/6)
+    Kolmogorov:  L0 = None  ->  PSD = 0.023 r0^(-5/3) f^(-11/3)
+
+    With `n_subharmonics > 0` the FFT screen is augmented with low-frequency
+    subharmonics to correct the period-equals-screen-size deficit.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    del_f = 1.0 / (npix * dx)
+    fx = np.fft.fftfreq(npix, d=dx)
+    fxx, fyy = np.meshgrid(fx, fx)
+    f2 = fxx ** 2 + fyy ** 2
+    f2[0, 0] = 1.0
+    inv_L0_sq = (1.0 / L0) ** 2 if L0 else 0.0
+    psd = 0.023 * r0 ** (-5.0 / 3.0) * (f2 + inv_L0_sq) ** (-11.0 / 6.0)
+    psd[0, 0] = 0.0
+
+    cn = rng.standard_normal((npix, npix)) + 1j * rng.standard_normal((npix, npix))
+    cn *= np.sqrt(psd) * del_f
+    screen = np.real(np.fft.ifft2(cn)) * npix ** 2
+    if n_subharmonics > 0:
+        screen = screen + _subharmonic_screen(npix, dx, r0, L0, rng, n_subharmonics)
+    return screen - screen.mean()
+
+
+def multilayer_boiling_sequence(
+    npix: int, dx: float, n_frames: int, r0: float, layers, dt: float,
+    rng: np.random.Generator | None = None, boil_frac: float = 0.2,
+    boil_alpha: float = 0.3, L0: float | None = None, n_subharmonics: int = 3,
+):
+    """Yield `n_frames` composite phase screens: multi-layer frozen flow + boiling.
+
+    layers : iterable of (cn2_weight, wind_speed [m/s], wind_dir [rad]).
+        Each layer is an independent screen with its own wind vector; the per-
+        layer r0 is set so the total turbulence integrates to `r0`
+        (r0_total^(-5/3) = sum_i r0_i^(-5/3)).
+    boil_frac : energy fraction in the boiling (non-frozen) component [0,1].
+        0 -> pure frozen flow (perfectly predictable); 1 -> pure boiling.
+    boil_alpha : AR(1) per-step innovation of the boiling field (0,1].
+        small -> slowly evolving (persistent); 1 -> decorrelates every frame.
+
+    The composite is the sum of, per layer, a deterministically drifting screen
+    (Taylor frozen flow) blended with a temporally-evolving AR(1) field. This
+    makes the sequence genuinely-predictable-but-not-trivial, with the
+    predictability set by (boil_frac, boil_alpha).
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    layers = list(layers)
+    w = np.array([float(c) for (c, _, _) in layers])
+    w = w / w.sum()
+    r0_layer = [r0 * wi ** (-3.0 / 5.0) for wi in w]   # split Cn^2 across layers
+
+    # Per-layer drifting substrate (padded for the total 2-D drift) + boil state.
+    substrates, pads, boil = [], [], []
+    for li, (_, speed, _) in enumerate(layers):
+        shift_per_frame = speed * dt / dx
+        pad = int(np.ceil(shift_per_frame * n_frames)) + 2
+        big = _next_even(npix + 2 * pad)
+        if big > 4096:
+            raise ValueError(
+                f"layer substrate would be {big}px (wind*dt/dx*n_frames too large); "
+                f"reduce dt or n_frames (need dt << tau0)."
+            )
+        substrates.append(
+            vonkarman_screen(big, dx, r0_layer[li], L0, rng, n_subharmonics))
+        pads.append(pad)
+        boil.append(
+            vonkarman_screen(npix, dx, r0_layer[li], L0, rng, n_subharmonics))
+
+    a = boil_alpha
+    for k in range(n_frames):
+        comp = np.zeros((npix, npix))
+        for li, (_, speed, direction) in enumerate(layers):
+            spf = speed * dt / dx
+            ox = pads[li] + int(round(k * spf * np.cos(direction)))
+            oy = pads[li] + int(round(k * spf * np.sin(direction)))
+            drift = substrates[li][oy:oy + npix, ox:ox + npix]
+            if k > 0:
+                fresh = vonkarman_screen(npix, dx, r0_layer[li], L0, rng,
+                                         n_subharmonics)
+                boil[li] = np.sqrt(1 - a ** 2) * boil[li] + a * fresh
+            comp += np.sqrt(1 - boil_frac) * drift + np.sqrt(boil_frac) * boil[li]
+        comp -= comp.mean()
+        yield comp

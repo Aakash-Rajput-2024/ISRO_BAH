@@ -34,6 +34,24 @@ def residual_rms(truth: np.ndarray, recon: np.ndarray, mask: np.ndarray) -> floa
     return float(np.sqrt(np.mean(res ** 2)))
 
 
+def wavefront_r2(truth: np.ndarray, recon: np.ndarray, mask: np.ndarray) -> float:
+    """Coefficient of determination R^2 between true and reconstructed wavefront.
+
+    R^2 = 1 - SS_res / SS_tot over the pupil; 1.0 is perfect, 0 is no better
+    than predicting the mean. The single scale-free number for ranking methods.
+    """
+    t = truth[mask]
+    r = recon[mask]
+    ss_res = float(np.sum((t - r) ** 2))
+    ss_tot = float(np.sum((t - t.mean()) ** 2))
+    return 1.0 - ss_res / ss_tot if ss_tot > 0 else float("nan")
+
+
+def strehl_estimate(residual_rms_rad: float) -> float:
+    """Marechal-approximation Strehl ratio from residual RMS phase [rad]."""
+    return float(np.exp(-(residual_rms_rad ** 2)))
+
+
 def snr_of_frame(frame: np.ndarray) -> float:
     """Empirical spot SNR: peak signal over background noise std.
 
