@@ -1,0 +1,66 @@
+{
+  "config": {
+    "n_lenslets": 16,
+    "lenslet_pitch": 0.0003,
+    "focal_length": 0.02,
+    "pix_per_lenslet": 24,
+    "pixel_size": 5.5e-06,
+    "wavelength": 5e-07,
+    "n_modes": 20,
+    "illum_threshold": 0.5,
+    "npix": 384,
+    "pupil_diameter": 0.0048,
+    "pupil_dx": 1.2499999999999999e-05,
+    "slope_scale": 3455.751918948772
+  },
+  "config_hash": "f77ec0fa9e58552e",
+  "arrays": {
+    "flat_frame": [
+      384,
+      384
+    ],
+    "frame": [
+      384,
+      384
+    ],
+    "ref_x": [
+      208
+    ],
+    "ref_y": [
+      208
+    ],
+    "cx": [
+      208
+    ],
+    "cy": [
+      208
+    ],
+    "slopes": [
+      416
+    ],
+    "coeffs": [
+      20
+    ],
+    "wavefront": [
+      384,
+      384
+    ],
+    "D": [
+      416,
+      20
+    ],
+    "R": [
+      20,
+      416
+    ],
+    "coeffs_in": [
+      20
+    ]
+  },
+  "tolerances": {
+    "centroid_px": 1e-06,
+    "slope_rel": 1e-09,
+    "coeff_rel": 1e-09
+  },
+  "note": "Reference vectors for the SH-WFS C port. Compare against the stored R (do not recompute pinv)."
+}

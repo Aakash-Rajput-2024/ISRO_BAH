@@ -1,9 +1,15 @@
 __pycache__/
 *.pyc
-outputs/
 .pytest_cache/
 .venv/
 .DS_Store
-.pytest_cache/
-outputs/
 .claude/
+
+# generated artefacts
+outputs/
+validations/outputs/
+
+# datasets (regenerable / provided separately; keep the dirs via .gitkeep)
+data/synthetic/*
+data/real/*
+!data/**/.gitkeep

@@ -12,9 +12,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .centroid import centroid_frame
-from .config import Config
-from .geometry import Geometry
+from ..common.centroid import centroid_frame
+from ..common.config import Config
+from ..common.geometry import Geometry
 from .reconstruct import ModalReconstructor
 
 

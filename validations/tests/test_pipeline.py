@@ -1,29 +1,19 @@
-"""Ground-truth tests for the SH-WFS pipeline.
+"""Ground-truth round-trip tests for the SH-WFS pipeline (Tier 1, fast).
 
-These are the oracle the eventual C port must reproduce.
+These are the original oracle checks the eventual C port must reproduce. They
+use the shared `pipe`/`cfg`/`tol` fixtures from conftest.py.
 """
-import os
-import sys
-
 import numpy as np
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from shwfs import Config, WFSPipeline
-from shwfs.phasescreen import kolmogorov_screen
-from shwfs.simulate import flat_frame, render_frame
-from shwfs.turbulence import estimate_r0
+from methods.modal_zernike import Config, WFSPipeline
+from methods.common.phasescreen import kolmogorov_screen
+from methods.common.simulate import flat_frame, render_frame
+from methods.common.turbulence import estimate_r0
 
 
-@pytest.fixture(scope="module")
-def pipe():
-    p = WFSPipeline(Config())
-    p.calibrate(flat_frame(p.cfg, p.geom))
-    return p
-
-
-def test_zernike_recovery(pipe):
+@pytest.mark.fast
+def test_zernike_recovery(pipe, tol):
     """A known Zernike aberration must round-trip through the pipeline.
 
     Inject astigmatism (j=5), coma (j=8) and spherical (j=11); the noiseless
@@ -39,9 +29,10 @@ def test_zernike_recovery(pipe):
     frame = render_frame(phase, pipe.cfg, pipe.geom)
     out = pipe.process(frame)
 
-    np.testing.assert_allclose(out.coeffs, coeffs_in, atol=0.03)
+    np.testing.assert_allclose(out.coeffs, coeffs_in, atol=tol["single_mode_recovery_rad"])
 
 
+@pytest.mark.fast
 def test_flat_wavefront_is_zero(pipe):
     """A flat wavefront produces ~zero slopes and coefficients."""
     frame = flat_frame(pipe.cfg, pipe.geom)
@@ -50,8 +41,9 @@ def test_flat_wavefront_is_zero(pipe):
     assert np.abs(out.coeffs).max() < 0.02
 
 
-def test_r0_estimate_recovers_truth():
-    """Estimated r0 from an ensemble should land within ~40% of the truth."""
+@pytest.mark.slow
+def test_r0_estimate_recovers_truth(tol):
+    """Estimated r0 from an ensemble should land within tolerance of truth."""
     cfg = Config()
     pipe = WFSPipeline(cfg)
     pipe.calibrate(flat_frame(cfg, pipe.geom))
@@ -68,4 +60,4 @@ def test_r0_estimate_recovers_truth():
         coeffs[k] = pipe.process(render_frame(ph, cfg, pipe.geom, rng=rng)).coeffs
 
     r0_est = estimate_r0(coeffs, D)
-    assert 0.6 * r0_true < r0_est < 1.6 * r0_true
+    assert (1 - tol["r0_rel"]) * r0_true < r0_est < (1 + tol["r0_rel"]) * r0_true

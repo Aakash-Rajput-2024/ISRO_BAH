@@ -17,9 +17,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from .config import Config
-from .geometry import Geometry
-from .zernike import zernike_basis
+from ..common.config import Config
+from ..common.geometry import Geometry
+from ..common.zernike import zernike_basis
 
 
 class ModalReconstructor:

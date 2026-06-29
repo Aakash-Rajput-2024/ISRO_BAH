@@ -17,8 +17,28 @@ can be checked against ground truth.
 ```bash
 pip install -r requirements.txt
 ./run.sh          # end-to-end demo -> outputs/reconstruction.png
-./run.sh test     # ground-truth tests
+./run.sh test     # fast regression suite
+./run.sh test-all # full suite (slow Monte-Carlo + golden + cross-validation)
+./run.sh validate # visual validation report -> outputs/validation/index.html
 ```
+
+Validation methodology, acceptance thresholds, and the real-data / C-port
+contracts are documented in [docs/VALIDATION.md](docs/VALIDATION.md).
+
+## Repository layout
+
+```
+data/                datasets + contract (synthetic generated, real .bmp)   -> data/README.md
+methods/
+  common/            method-agnostic core (config, geometry, zernike,
+                     phasescreen, simulate, centroid, turbulence)
+  modal_zernike/     Method 1: modal Zernike reconstruction               -> methods/modal_zernike/README.md
+validations/         metrics, plots, oracle, report + the pytest suite     -> validations/README.md
+docs/VALIDATION.md   validation methodology & thresholds
+```
+
+Add future reconstruction methods (zonal/Southwell, Karhunen-Loève, learned) as
+sibling sub-packages under `methods/`, reusing `methods/common/`.
 
 ## Pipeline
 
@@ -32,15 +52,15 @@ WFS frame  ->  centroiding  ->  slopes  ->  modal reconstruction  ->  W(x,y), Ze
 
 | Module | Role |
 |---|---|
-| `shwfs/config.py` | System parameters (MLA, detector, pupil). Replace defaults with lab numbers. |
-| `shwfs/geometry.py` | Pupil grid, valid sub-apertures, per-sub-aperture averaging operator. |
-| `shwfs/zernike.py` | Noll-ordered Zernike polynomials (unit-variance normalisation). |
-| `shwfs/phasescreen.py` | Kolmogorov phase screens (FFT) + frozen-flow time series. |
-| `shwfs/simulate.py` | Synthetic SH-WFS frame generator (the test oracle). |
-| `shwfs/centroid.py` | Thresholded centre-of-gravity spot centroiding. |
-| `shwfs/reconstruct.py` | Modal interaction matrix `D`, reconstructor `pinv(D)`. |
-| `shwfs/turbulence.py` | `r0` from Zernike-variance (Noll), `tau0` from temporal autocorrelation. |
-| `shwfs/pipeline.py` | Glue: calibrate + per-frame processing. |
+| `methods/common/config.py` | System parameters (MLA, detector, pupil). Replace defaults with lab numbers. |
+| `methods/common/geometry.py` | Pupil grid, valid sub-apertures, per-sub-aperture averaging operator. |
+| `methods/common/zernike.py` | Noll-ordered Zernike polynomials (unit-variance normalisation). |
+| `methods/common/phasescreen.py` | Kolmogorov phase screens (FFT) + frozen-flow time series. |
+| `methods/common/simulate.py` | Synthetic SH-WFS frame generator (the test oracle). |
+| `methods/common/centroid.py` | Thresholded centre-of-gravity spot centroiding. |
+| `methods/common/turbulence.py` | `r0` from Zernike-variance (Noll), `tau0` from temporal autocorrelation. |
+| `methods/modal_zernike/reconstruct.py` | Modal interaction matrix `D`, reconstructor `pinv(D)`. |
+| `methods/modal_zernike/pipeline.py` | Glue: calibrate + per-frame processing. |
 
 ## Key physics
 

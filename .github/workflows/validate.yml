@@ -1,0 +1,41 @@
+# SH-WFS validation CI.
+#
+# Inert until the repo has a GitHub remote; included so validation runs
+# automatically once it does. Fast gate on every push/PR; slow Monte-Carlo +
+# golden conformance + the visual report nightly.
+name: validate
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 3 * * *"   # nightly 03:00 UTC
+
+jobs:
+  fast:
+    name: fast suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -m fast -q
+
+  full:
+    name: slow + golden + report
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -m "slow or golden or crossval" -q
+      - run: python scripts/validate_report.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: outputs/validation/

@@ -17,19 +17,20 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, _ROOT)
 
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from shwfs import Config, WFSPipeline
-from shwfs.phasescreen import frozen_flow_sequence, kolmogorov_screen
-from shwfs.simulate import flat_frame, render_frame
-from shwfs.turbulence import estimate_r0, estimate_tau0
+from methods.modal_zernike import Config, WFSPipeline
+from methods.common.phasescreen import frozen_flow_sequence, kolmogorov_screen
+from methods.common.simulate import flat_frame, render_frame
+from methods.common.turbulence import estimate_r0, estimate_tau0
 
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outputs")
+OUT = os.path.join(_ROOT, "outputs")
 os.makedirs(OUT, exist_ok=True)
 
 

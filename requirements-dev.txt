@@ -1,0 +1,9 @@
+# Validation / dev dependencies (the runtime needs only requirements.txt).
+-r requirements.txt
+pytest>=8.0
+pytest-xdist>=3.5      # parallel test execution (-n auto)
+
+# Independent oracles for Tier-2 cross-validation. Tests skip cleanly if absent,
+# so these are optional; install to actually run `pytest -m crossval`.
+aotools>=1.0
+hcipy>=0.6
