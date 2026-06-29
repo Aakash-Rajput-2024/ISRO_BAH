@@ -8,5 +8,7 @@ pytest-xdist>=3.5      # parallel test execution (-n auto)
 aotools>=1.0
 hcipy>=0.6
 
-# Method 3 (deep-learning ResU-Net). Optional; ml-marked tests skip if absent.
+# Deep-learning methods (3: ResU-Net, 4: HRNet temporal). Optional; ml-marked
+# tests skip if torch is absent. tqdm drives the training progress bar.
 torch>=2.0
+tqdm>=4.60

@@ -1,18 +1,72 @@
+# ---- Python ----
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.installed.cfg
+*.egg
+
+# ---- Test / type / lint caches ----
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# ---- Virtual environments ----
 .venv/
+venv/
+venvNPT/
+env/
+ENV/
+*.env
+.python-version
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+
+# ---- Editors / OS ----
+.vscode/
+.idea/
+*.swp
+*~
 .DS_Store
+Thumbs.db
+Desktop.ini
+
+# ---- Tooling ----
 .claude/
 
-# generated artefacts
+# ---- ML model weights ----
+# (the golden oracle fixture under validations/tests/fixtures/golden/ is .npz/.json
+#  and is intentionally tracked -- do NOT blanket-ignore .npz/.npy here.)
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+
+# ---- Experiment tracking / logs ----
+runs/
+wandb/
+lightning_logs/
+*.log
+
+# ---- Generated artefacts ----
 outputs/
 validations/outputs/
 methods/**/outputs/
 methods/**/weights/
-*.pt
 
-# datasets (regenerable / provided separately; keep the dirs via .gitkeep)
+# ---- Datasets (regenerable, or provided separately) ----
+# Keep the empty dirs via .gitkeep; ignore their contents.
 data/synthetic/*
 data/real/*
 !data/**/.gitkeep
