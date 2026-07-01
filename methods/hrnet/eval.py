@@ -47,9 +47,16 @@ def evaluate(data_path, ckpt_path, max_windows=300, n_panels=4):
 
     ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     n_frames, w, wf_scale = ckpt["n_frames"], ckpt["out_size"], ckpt["wf_scale"]
+    # Depth knobs default to the original architecture for pre-existing checkpoints.
     model = HRNetWavefront(n_frames=n_frames, base_channels=ckpt["channels"],
+                           blocks_per_branch=ckpt.get("blocks_per_branch", 2),
+                           frame_depth_growth=ckpt.get("frame_depth_growth", 1),
                            head="map", out_size=w).to(device)
     model.load_state_dict(ckpt["state_dict"]); model.eval()
+    n_params = sum(p.numel() for p in model.parameters())
+    print(f"checkpoint: {os.path.basename(ckpt_path)}  "
+          f"({n_frames}f, {ckpt['channels']}ch, blk={ckpt.get('blocks_per_branch', 2)}, "
+          f"grow={ckpt.get('frame_depth_growth', 1)}, {n_params/1e3:.0f}k params)")
 
     cfg = Config()
     pipe = WFSPipeline(cfg)

@@ -7,6 +7,7 @@
 #   ./run.sh dataset     -> generate an i.i.d. ensemble dataset into data/synthetic/
 #   ./run.sh seqdataset  -> generate a temporal (N,T,D,D) dataset into data/synthetic/
 #   ./run.sh benchmark   -> compare methods on a dataset (pass --data ... [--resunet ckpt])
+#   ./run.sh latency     -> end-to-end per-frame latency (real-time budget check)
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -19,5 +20,6 @@ case "$cmd" in
   dataset) python3 data/make_dataset.py "$@" ;;
   seqdataset) python3 data/make_sequence_dataset.py "$@" ;;
   benchmark) python3 validations/benchmark.py "$@" ;;
-  *) echo "usage: ./run.sh [demo|test|test-all|validate|dataset|seqdataset|benchmark]"; exit 1 ;;
+  latency) python3 latencycheck.py "$@" ;;
+  *) echo "usage: ./run.sh [demo|test|test-all|validate|dataset|seqdataset|benchmark|latency]"; exit 1 ;;
 esac

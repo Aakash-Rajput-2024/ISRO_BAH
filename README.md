@@ -20,6 +20,7 @@ pip install -r requirements.txt
 ./run.sh test     # fast regression suite
 ./run.sh test-all # full suite (slow Monte-Carlo + golden + cross-validation)
 ./run.sh validate # visual validation report -> outputs/validation/index.html
+./run.sh latency  # end-to-end per-frame latency, all methods -> outputs/latency.md
 ```
 
 Validation methodology, acceptance thresholds, and the real-data / C-port
@@ -77,7 +78,8 @@ WFS frame  ->  centroiding  ->  slopes  ->  modal reconstruction  ->  W(x,y), Ze
 ## Status / next steps
 
 Done: synthetic generator, centroiding, slopes, modal reconstruction, `r0`,
-`tau0`, ground-truth tests.
+`tau0`, ground-truth tests, **C++ centroiding inner loop** (`methods/common/cpp/`,
+golden-tested vs numpy) and an **end-to-end latency benchmark** (`latencycheck.py`).
 
 Planned:
 - Zonal (Fried-geometry) reconstruction as an alternative to modal.
@@ -85,7 +87,36 @@ Planned:
   coupling), solve `c = pinv(H) · (-W/2)` in actuator-stroke units.
 - Subharmonic-augmented phase screens (removes the FFT low-frequency `r0` bias).
 - Real `.bmp` ingest + sub-aperture grid auto-detection from a flat frame.
-- C port of the centroiding + reconstruction inner loop; benchmark < ~10 ms/frame.
+- Port the modal matrix-vector reconstruction to C++ too (centroiding is done).
+
+## Latency (real-time budget)
+
+The control loop must produce a wavefront within ~10 ms of a frame arriving.
+`latencycheck.py` times the **full** per-frame chain (not just the matrix
+product) for every method on identical, realistically-rendered frames, and
+reports mean/median/p95/p99 + frame rate against the budget:
+
+| method (per frame) | mean | p99 | vs 10 ms |
+|---|---|---|---|
+| modal_zernike (numpy) | 2.1 ms | 2.3 ms | **PASS** |
+| modal_zernike_cpp | 0.5 ms | 0.6 ms | **PASS** |
+| deep_resunet (Method 3) | 31 ms | 34 ms | FAIL |
+| hrnet_full (18ch, blk2, grow1; 1.14 M) | 13.7 ms | 14.4 ms | FAIL |
+| hrnet_small (18ch, blk1, grow0; 648 k) | 8.7 ms | 9.4 ms | **PASS** |
+
+Numbers are from an Apple-MPS dev box (idle); run `./run.sh latency` for your
+hardware. Two changes bring a method under budget:
+
+- **C++ centroiding inner loop** (`methods/common/cpp/`): the per-sub-aperture
+  pixel loop drops from ~1.8 ms to ~0.25 ms (~7×), so the whole modal path is
+  ~0.5 ms — and it stays the most *accurate* method too (held-out R² ≈ 0.94).
+- **Depth-trimmed HRNet** (`hrnet_small`): 13.7 → 8.7 ms (1.6×), 648 k vs
+  1.14 M params. It was shrunk by cutting **sequential depth** (blocks/branch,
+  per-frame encoder growth), *not* channels — on this GPU the net is
+  launch/depth-bound, so channels barely move latency (18→32 ch ≈ same ms).
+  Cost: held-out wavefront R² 0.836 → 0.772 (−7.6%); channel width was kept
+  full precisely to limit that loss. Retrain with
+  `methods/hrnet/train.py --channels 18 --blocks-per-branch 1 --frame-depth-growth 0`.
 
 ## Caveats
 

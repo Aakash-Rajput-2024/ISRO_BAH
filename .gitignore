@@ -53,6 +53,12 @@ Desktop.ini
 *.onnx
 *.safetensors
 
+# ---- Compiled C/C++ extensions (auto-built from source on import) ----
+*.so
+*.dylib
+*.o
+*.obj
+
 # ---- Experiment tracking / logs ----
 runs/
 wandb/

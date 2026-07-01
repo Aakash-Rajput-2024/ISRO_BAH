@@ -73,7 +73,7 @@ class WindowDataset(Dataset):
 
 
 def train(data_path, n_frames=5, channels=18, epochs=20, batch=8, lr=1e-3,
-          device=None, seed=0, tag=""):
+          device=None, seed=0, tag="", blocks_per_branch=2, frame_depth_growth=1):
     torch.manual_seed(seed)
     device = device or pick_device()
     data = load_sequences(data_path)
@@ -91,10 +91,15 @@ def train(data_path, n_frames=5, channels=18, epochs=20, batch=8, lr=1e-3,
     tl = DataLoader(WindowDataset(tv, wf_scale), batch_size=batch, shuffle=True)
     vl = DataLoader(WindowDataset(vv, wf_scale), batch_size=batch)
     print(f"device={device}  train windows={len(tv)}  val windows={len(vv)}  "
-          f"n_frames={n_frames}  out_size={w}  wf_scale={wf_scale:.3f}")
+          f"n_frames={n_frames}  channels={channels}  blocks/branch={blocks_per_branch}  "
+          f"depth_growth={frame_depth_growth}  out_size={w}  wf_scale={wf_scale:.3f}")
 
     model = HRNetWavefront(n_frames=n_frames, base_channels=channels,
+                           blocks_per_branch=blocks_per_branch,
+                           frame_depth_growth=frame_depth_growth,
                            head="map", out_size=w).to(device)
+    n_params = sum(p.numel() for p in model.parameters())
+    print(f"model parameters: {n_params/1e3:.1f}k")
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = torch.nn.MSELoss()
 
@@ -103,8 +108,12 @@ def train(data_path, n_frames=5, channels=18, epochs=20, batch=8, lr=1e-3,
     ckpt_path = os.path.join(WEIGHTS_DIR, f"{name}.pt")
 
     def save(epoch, best_val):
+        # blocks_per_branch/frame_depth_growth are persisted so eval/inference can
+        # rebuild the exact architecture (old checkpoints default to 2/1).
         torch.save({"state_dict": model.state_dict(), "n_frames": n_frames,
-                    "channels": channels, "out_size": w, "wf_scale": wf_scale,
+                    "channels": channels, "blocks_per_branch": blocks_per_branch,
+                    "frame_depth_growth": frame_depth_growth,
+                    "out_size": w, "wf_scale": wf_scale, "n_params": n_params,
                     "history": hist, "epoch": epoch, "best_val": best_val}, ckpt_path)
 
     hist = {"train": [], "val": []}
@@ -126,14 +135,17 @@ def train(data_path, n_frames=5, channels=18, epochs=20, batch=8, lr=1e-3,
                 va += loss_fn(model(xb), yb).item() * xb.size(0)
         tr /= len(tl.dataset); va /= len(vl.dataset)
         hist["train"].append(tr); hist["val"].append(va)
-        best_val = min(best_val, va)
-        # Save after EVERY epoch into the one checkpoint file (overwritten).
-        save(ep + 1, best_val)
+        # Keep the BEST checkpoint (lowest val), not the last -- the model can
+        # mildly overfit past its val minimum, and we want to ship its best.
+        improved = va < best_val
+        if improved:
+            best_val = va
+            save(ep + 1, best_val)
         _plot(hist, name)
-        flag = "  *best" if va <= best_val else ""
-        print(f"epoch {ep+1:3d}/{epochs}  train {tr:.4e}  val {va:.4e}  [saved]{flag}")
+        print(f"epoch {ep+1:3d}/{epochs}  train {tr:.4e}  val {va:.4e}"
+              f"{'  [saved *best]' if improved else ''}")
 
-    print(f"checkpoint -> {ckpt_path}")
+    print(f"best val {best_val:.4e}  ->  {ckpt_path}")
     return ckpt_path
 
 
@@ -160,15 +172,22 @@ def main():
                         f"{os.path.relpath(DEFAULT_DATA, _ROOT)}")
     p.add_argument("--n-frames", type=int, default=5)
     p.add_argument("--channels", type=int, default=18)
+    p.add_argument("--blocks-per-branch", type=int, default=2,
+                   help="ResNet blocks per branch per stage (depth knob)")
+    p.add_argument("--frame-depth-growth", type=int, default=1,
+                   help="extra encoder blocks per frame lag (0 = flat depth)")
     p.add_argument("--epochs", type=int, default=20)
     p.add_argument("--batch", type=int, default=8)
     p.add_argument("--lr", type=float, default=1e-3)
+    p.add_argument("--tag", default="", help="checkpoint name suffix, e.g. _small")
     p.add_argument("--auto-n", type=int, default=120, help="instances if auto-generating")
     p.add_argument("--auto-t", type=int, default=24, help="frames/instance if auto-generating")
     args = p.parse_args()
     data_path = resolve_data(args.data, auto_n=args.auto_n, auto_t=args.auto_t)
     train(data_path, n_frames=args.n_frames, channels=args.channels,
-          epochs=args.epochs, batch=args.batch, lr=args.lr)
+          blocks_per_branch=args.blocks_per_branch,
+          frame_depth_growth=args.frame_depth_growth,
+          epochs=args.epochs, batch=args.batch, lr=args.lr, tag=args.tag)
 
 
 if __name__ == "__main__":
